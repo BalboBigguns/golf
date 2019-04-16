@@ -20,18 +20,41 @@ double b; // odleglosc miedzy kijem i czujnikiem z rzedu nr 4
 
 bool wasMeasured = false;
 bool isBallInPlace = false;
+
+unsigned long startOfMeasurement = 0;
+int numOfMeasurements = 0;
+
 int error;
 int lightThreshold; // zalezy od kalibracji
 
 /////////////////////////////////////////////////////////////////////////////////////
 
+void resetTimes()
+{
+    for (int i = 0; i < 10; i++) {
+        times[i] = 0;
+        wasMeasured = false;
+        numOfMeasurements = 0;
+    }
+}
+
 bool measureStrike() 
 {
-    bool wasMeasured = false;
+    // zliczanie pomiarow: 
+    // 1 pomiar w L1, 
+    // do predkosci - 1 pomiar w L2
+    // do kata - 2 pomiary  w L2
 
     for (int i = 0; i < 10; i++) {
         if (analogRead(AnalogPins(i)) > lightThreshold) {
-            times[i] = micros();
+            if (!startOfMeasurement) {
+                startOfMeasurement = milis();
+            }
+
+            if (times[i] == 0) {
+                times[i] = micros();
+                numOfMeasurements++;
+            }
             wasMeasured = true;
         }    
     }
@@ -51,13 +74,8 @@ void showResults()
     lcd.print(error);    
 }
 
-//////////////////////////////////////////////////////////////////////////////////////
-void setup()
+void showWelcomeMessage()
 {
-    Serial.begin(1000000);
-
-    lightThreshold = analogRead(A0) + 50;        // TODO: funkcja do kalibracji
-
     lcd.begin(20, 4); // Inicjalizacja LCD 2x16
     lcd.backlight();     // zalaczenie podwietlenia
     lcd.setCursor(3, 0); // Ustawienie kursora w pozycji 0,0 (pierwszy wiersz, pierwsza kolumna)
@@ -65,6 +83,16 @@ void setup()
     delay(500);
     lcd.setCursor(0, 1); //Ustawienie kursora w pozycji 0,0 (drugi wiersz, pierwsza kolumna)
     lcd.print("2k19");
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+void setup()
+{
+    Serial.begin(1000000);
+
+    lightThreshold = analogRead(A0) + 50;        // TODO: funkcja do kalibracji, indywidualny threshold
+
+    showWelcomeMessage();
 }
 
 void loop()
@@ -76,22 +104,25 @@ void loop()
         isBallInPlace = false;
     }
 
-    if (isBallInPlace == true) {     
+    if (isBallInPlace == true) { 
+        if (milis() - startOfMeasurement >= 1000) {  // resetuje pomiary co sekunde, zapobiega niedokonczonym uderzeniom
+            resetTimes();
+        }
         wasMeasured = measureStrike();
     }
 
     if (isBallInPlace == false && wasMeasured == true)
     {
         wasMeasured = false;
-        delta = L2[2] - L1[2];
+        delta = times[2] - times[7];
         v_swing = DISTANCE_BETWEEN_LINES * 3600 / delta; //zamiana z cm/mikrosekunde na km/h
 
-        if (L2[2] > L2[4]) {
-            delta_t = L2[2] - L2[4]; //wyliczanie czasu wzdluz czujnikow
-            error = 1;
+        if (times[7] > times[9]) {
+            delta_t = times[7] - times[9]; //wyliczanie czasu wzdluz czujnikow
+            error = 1; // clockwise
         }
         else {
-            delta_t = L2[4] - L2[2];
+            delta_t = times[9] - times[7];
             error = 0;
         }
 
