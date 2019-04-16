@@ -84,7 +84,7 @@ double calcVelocity()
 
     // stary dobry bubble
     for (i = 0; i < 5; i++) {
-        for (j = i; j < 4; j++) {
+        for (j = 0; j < 4 - i; j++) {
             if (delta[j] > delta[j + 1]){
                 temp = delta[j];
                 delta[j] = delta[j + 1];
@@ -104,7 +104,7 @@ double calcVelocity()
         }
     }
 
-    return DISTANCE_BETWEEN_LINES / (delta[j] + delta[j + 1] / 2);
+    return DISTANCE_BETWEEN_LINES / (double)(delta[j] + delta[j + 1] / 2);
 }
 
 #ifdef PRINT_TO_LCD
