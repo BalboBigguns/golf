@@ -16,10 +16,7 @@ int AnalogPins[] = {A0, A1, A2, A3, A4, A5, A6, A7, A8, A9};
 double v_swing = 0;  // predkosc kija
 double delta = 0;   // roznica czasu miedzy linia I i linia II
 double delta_t = 0; // roznica czasu miedzy rzedami 2 i 4 linii II
-double angle = 0;
 double angle_st = 0;
-
-double b; // odleglosc miedzy kijem i czujnikiem z rzedu nr 4
 
 bool wasMeasured = false;
 bool isBallInPlace = false;
@@ -77,6 +74,7 @@ double calcVelocity()
     unsigned long delta[5] = {0};
     unsigned long temp, min;
     int i, j;
+    double velocity;
   
     for (i = 0; i < 5; i++) {
         if (times[i] != 0 && times[i + 5] != 0) {
@@ -101,12 +99,24 @@ double calcVelocity()
     for (i = 0; i < 4; i++) {
         temp = delta[i + 1] - delta[i];
         if (temp < min) {
-          min = temp;
-          j = i;
+            min = temp;
+            j = i;
         }
     }
-
-    return DISTANCE_BETWEEN_LINES / (double)(delta[j] + delta[j + 1] / 2);
+  
+    //w przypadku jak tylko jeden rzad zalapal caly, jest bez sredniej
+    //                                  TODO:(mozna sprobowac dopasowac po trojkacie zeby odzyskac wiecej wynikow)
+    if (delta[j] == 0) {
+        velocity = DISTANCE_BETWEEN_LINES / (double)delta[j + 1];
+    }
+    else if (delta[j + 1] == 0){
+        velocity = DISTANCE_BETWEEN_LINES / (double)delta[j];
+    }
+    else {
+        velocity = DISTANCE_BETWEEN_LINES / ((double)(delta[j + 1] + delta[j]) / 2);
+    }
+  
+    return velocity;
 }
 
 double calcAngle()
@@ -114,37 +124,50 @@ double calcAngle()
     unsigned long delta[4] = { 0 };
     unsigned long dSum = 0;
     unsigned long lastValue = 0;
+    double angle = 0;
+    int numOfDeltasCalculated = 0;
 
     //przeliczanie roznicy czasow
     for (int i = 5; i < 9; i++) {
         if (times[i] != 0) {
-            for (int j = i + 1; j < 10; j++ ) {
+            for (int j = i + 1; j < 10; j++) {
                 if (times[j] != 0) {
-                    delta[i] = (times[i] - times[j]) /(j - i);   // prawy timestamp odjac lewy timestamp (delty liczone od prawej do lewej strony)
-                    dSum += delta[i];
-                    lastValue = delta[i];
+                    delta[i - 5] = ((double)times[i] - times[j]) / (j - i);   // prawy timestamp odjac lewy timestamp (delty liczone od prawej do lewej strony)
+                    dSum += delta[i - 5];
+                    lastValue = delta[i - 5];
+                    break;
                 }
+            else {
+                lastValue = 0;
             }
+          }
         }
         else {
-            delta[i] = lastValue;
-            dSum += delta[i];
+            delta[i - 5] = lastValue;
+            dSum += delta[i - 5];
+        }
+    
+        if (delta[i - 5]) {
+            numOfDeltasCalculated++;
         }
     }
 
     //ustalenie przewazajacego obrotu
-    //(mozna dodac jakis margines bledu dla NONE)
+    //                            TODO: (mozna dodac jakis margines bledu dla NONE)
     if (dSum < 0) {
         rotationError = COUNTERCLOCKWISE;
-
-        
+        angle = -1 * atan2(dSum * v_swing, numOfDeltasCalculated * DISTANCE_BETWEEN_SENSORS);
     }
     else if (dSum > 0) {
         rotationError = CLOCKWISE;
+        angle = atan2(dSum * v_swing, numOfDeltasCalculated * DISTANCE_BETWEEN_SENSORS);
     }
     else {
         rotationError = NONE;
+        angle = 0;
     }
+
+    return 180 * angle / PI;  // zamiana na stopnie
 }
 
 #ifdef PRINT_TO_LCD
@@ -216,21 +239,10 @@ void loop()
     if (isBallInPlace == false && wasMeasured == true)
     {
         wasMeasured = false;
-        delta = times[2] - times[7];
+
+        v_swing = calcVelocity();
+        angle_st = calcAngle();
         v_swing = DISTANCE_BETWEEN_LINES * 3600 / delta; //zamiana z cm/mikrosekunde na km/h
-
-        if (times[7] > times[9]) {
-            delta_t = times[7] - times[9]; //wyliczanie czasu wzdluz czujnikow
-            rotationError = CLOCKWISE; // clockwise
-        }
-        else {
-            delta_t = times[9] - times[7];
-            rotationError = COUNTERCLOCKWISE;
-        }
-
-        b = delta_t * DISTANCE_BETWEEN_LINES / delta;
-        angle = atan2(b, 2 * DISTANCE_BETWEEN_SENSORS);
-        angle_st = 180 * angle / PI;
 
         #ifdef PRINT_TO_LCD
         showResults();  // pokazuje wyniki na wyswietlaczu
