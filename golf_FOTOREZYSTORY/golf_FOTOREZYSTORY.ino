@@ -2,6 +2,7 @@
 
 #define DISTANCE_BETWEEN_LINES 7   // odleglosc miedzy liniami I i II
 #define DISTANCE_BETWEEN_SENSORS 1 // odleglosc miedzy dwoma sensorami w rzedzie
+#define MEASUREMENTS_REFRESH_DELAY 1000 // czas zachowania wynikow machania bez stracenia pileczki
 
 //#define PRINT_TO_LCD   // tryb pracy z lcd albo bez
 
@@ -31,6 +32,67 @@ enum rotation rotationError = NONE;
 
 /////////////////////////////////////////////////////////////////////////////////////
 
+void resetTimes();
+bool measureStrike();
+double calcVelocity();
+double calcAngle();
+void showResults();
+void showWelcomeMessage();
+void showError();
+void logSensors();
+void logResults();
+
+//////////////////////////////////////////////////////////////////////////////////////
+void setup()
+{
+    Serial.begin(1000000);
+
+    lightThreshold = analogRead(A0) + 50;        // TODO: funkcja do kalibracji, indywidualny threshold
+
+    #ifdef PRINT_TO_LCD
+    showWelcomeMessage();
+    #endif
+}
+
+void loop()
+{
+    if (analogRead(A10) > lightThreshold) {
+        isBallInPlace = true;
+    }
+    else {
+        isBallInPlace = false;
+    }
+
+    if (isBallInPlace == true) { 
+        if (millis() - startOfMeasurement >= MEASUREMENTS_REFRESH_DELAY) {  // resetuje pomiary co sekunde, zapobiega niedokonczonym uderzeniom
+            resetTimes();
+        }
+        wasMeasured = measureStrike();
+    }
+
+    if (isBallInPlace == false && wasMeasured == true)
+    {
+        wasMeasured = false;
+
+        v_swing = calcVelocity();
+        angle_st = calcAngle();
+        v_swing = DISTANCE_BETWEEN_LINES * 3600 / delta; //zamiana z cm/mikrosekunde na km/h
+
+        #ifdef PRINT_TO_LCD
+        showResults();  // pokazuje wyniki na wyswietlaczu
+        #endif
+
+        logResults();
+    }
+    else if (isBallInPlace == false && wasMeasured == false) {
+        logResults();
+        #ifdef PRINT_TO_LCD
+        showError();
+        #endif
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
 void resetTimes()
 {
     for (int i = 0; i < 10; i++) {
@@ -196,6 +258,18 @@ void showWelcomeMessage()
     lcd.print("2k19");
 }
 
+void showError()
+{
+    lcd.begin(20, 4); // Inicjalizacja LCD 2x16
+    lcd.backlight();     // zalaczenie podwietlenia
+    lcd.setCursor(0, 0); // Ustawienie kursora w pozycji 0,0 (pierwszy wiersz, pierwsza kolumna)
+    lcd.print("#ERROR:");
+    lcd.setCursor(0, 1); //Ustawienie kursora w pozycji 0,0 (drugi wiersz, pierwsza kolumna)
+    lcd.print("Brak wystarczajacej");
+    lcd.setCursor(0, 2);
+    lcd.print("ilosci danych!"); 
+}
+
 #endif
 
 void printLogs()
@@ -208,58 +282,19 @@ void printLogs()
     Serial.println("");
 }
 
-//////////////////////////////////////////////////////////////////////////////////////
-void setup()
+void logResults()
 {
-    Serial.begin(1000000);
+    ////////////////////////////////////////////////
+    Serial.print("Predkosc: ");
+    Serial.print(v_swing);
+    Serial.print("\t");
 
-    lightThreshold = analogRead(A0) + 50;        // TODO: funkcja do kalibracji, indywidualny threshold
+    Serial.print("Kat: ");
+    Serial.print(angle_st);
+    Serial.print("\t");
 
-    #ifdef PRINT_TO_LCD
-    showWelcomeMessage();
-    #endif
-}
-
-void loop()
-{
-    if (analogRead(A10) > lightThreshold) {
-        isBallInPlace = true;
-    }
-    else {
-        isBallInPlace = false;
-    }
-
-    if (isBallInPlace == true) { 
-        if (millis() - startOfMeasurement >= 1000) {  // resetuje pomiary co sekunde, zapobiega niedokonczonym uderzeniom
-            resetTimes();
-        }
-        wasMeasured = measureStrike();
-    }
-
-    if (isBallInPlace == false && wasMeasured == true)
-    {
-        wasMeasured = false;
-
-        v_swing = calcVelocity();
-        angle_st = calcAngle();
-        v_swing = DISTANCE_BETWEEN_LINES * 3600 / delta; //zamiana z cm/mikrosekunde na km/h
-
-        #ifdef PRINT_TO_LCD
-        showResults();  // pokazuje wyniki na wyswietlaczu
-        #endif
-
-        ////////////////////////////////////////////////
-        Serial.print("Predkosc: ");
-        Serial.print(v_swing);
-        Serial.print("\t");
-
-        Serial.print("Kat: ");
-        Serial.print(angle_st);
-        Serial.print("\t");
-
-        Serial.print("Swing rotationError: ");
-        Serial.print(rotationError);
-        Serial.print("\n");
-        //////////////////////////////////////////////////
-    }
+    Serial.print("Swing rotationError: ");
+    Serial.print(rotationError);
+    Serial.print("\n");
+    //////////////////////////////////////////////////
 }
