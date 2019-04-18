@@ -1,3 +1,3 @@
-﻿  main.c
-c:\users\michał\desktop\repos\c\first year\test\test\main.c(70): warning C4244: 'function': conversion from 'time_t' to 'unsigned int', possible loss of data
-  test.vcxproj -> C:\Users\Michał\Desktop\Repos\C\First year\test\Debug\test.exe
+﻿  main.cpp
+c:\users\michał\desktop\golf\test\test\main.cpp(152): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
+  test.vcxproj -> C:\Users\Michał\Desktop\golf\test\Debug\test.exe

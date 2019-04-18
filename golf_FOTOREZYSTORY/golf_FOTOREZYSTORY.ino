@@ -27,8 +27,10 @@ bool isBallInPlace = false;
 unsigned long startOfMeasurement = 0;
 int numOfMeasurements = 0;
 
-int error;
 int lightThreshold; // zalezy od kalibracji
+
+enum rotation {NONE, CLOCKWISE, COUNTERCLOCKWISE};  // typ skrecenia kija przy uderzeniu
+enum rotation rotationError = NONE;
 
 /////////////////////////////////////////////////////////////////////////////////////
 
@@ -96,7 +98,7 @@ double calcVelocity()
     j = 0;  // indeks pierwszego z najbardziej podobnych elementow
     min = delta[0];   // min roznicy miedzy wartosciami
     
-    for (i = 0; i < 4; i++){
+    for (i = 0; i < 4; i++) {
         temp = delta[i + 1] - delta[i];
         if (temp < min) {
           min = temp;
@@ -105,6 +107,44 @@ double calcVelocity()
     }
 
     return DISTANCE_BETWEEN_LINES / (double)(delta[j] + delta[j + 1] / 2);
+}
+
+double calcAngle()
+{
+    unsigned long delta[4] = { 0 };
+    unsigned long dSum = 0;
+    unsigned long lastValue = 0;
+
+    //przeliczanie roznicy czasow
+    for (int i = 5; i < 9; i++) {
+        if (times[i] != 0) {
+            for (int j = i + 1; j < 10; j++ ) {
+                if (times[j] != 0) {
+                    delta[i] = (times[i] - times[j]) /(j - i);   // prawy timestamp odjac lewy timestamp (delty liczone od prawej do lewej strony)
+                    dSum += delta[i];
+                    lastValue = delta[i];
+                }
+            }
+        }
+        else {
+            delta[i] = lastValue;
+            dSum += delta[i];
+        }
+    }
+
+    //ustalenie przewazajacego obrotu
+    //(mozna dodac jakis margines bledu dla NONE)
+    if (dSum < 0) {
+        rotationError = COUNTERCLOCKWISE;
+
+        
+    }
+    else if (dSum > 0) {
+        rotationError = CLOCKWISE;
+    }
+    else {
+        rotationError = NONE;
+    }
 }
 
 #ifdef PRINT_TO_LCD
@@ -118,7 +158,7 @@ void showResults()
     lcd.setCursor(0, 1); //Ustawienie kursora w pozycji 0,0 (drugi wiersz, pierwsza kolumna)
     lcd.print(angle_st);
     lcd.setCursor(0, 2);
-    lcd.print(error);    
+    lcd.print(rotationError);    
 }
 
 
@@ -181,11 +221,11 @@ void loop()
 
         if (times[7] > times[9]) {
             delta_t = times[7] - times[9]; //wyliczanie czasu wzdluz czujnikow
-            error = 1; // clockwise
+            rotationError = CLOCKWISE; // clockwise
         }
         else {
             delta_t = times[9] - times[7];
-            error = 0;
+            rotationError = COUNTERCLOCKWISE;
         }
 
         b = delta_t * DISTANCE_BETWEEN_LINES / delta;
@@ -205,8 +245,8 @@ void loop()
         Serial.print(angle_st);
         Serial.print("\t");
 
-        Serial.print("Swing error: ");
-        Serial.print(error);
+        Serial.print("Swing rotationError: ");
+        Serial.print(rotationError);
         Serial.print("\n");
         //////////////////////////////////////////////////
     }
