@@ -9,11 +9,14 @@
 #define ANGLE
 
 #define DISTANCE_BETWEEN_LINES 7
+#define DISTANCE_BETWEEN_SENSORS 1
 
 unsigned long times[10] = { 0 };
 
 enum rotation { NONE, CLOCKWISE, COUNTERCLOCKWISE };  // typ skrecenia kija przy uderzeniu
 enum rotation rotationError = NONE;
+
+double velocity = 0;
 
 #ifdef VELOCITY
 double calcVelocity()
@@ -99,6 +102,7 @@ double calcAngle()
 	double dSum = 0;
 	double lastValue = 0;
 	double angle = 0;
+	int numOfDeltasCalculated = 0;
 
 	//przeliczanie roznicy czasow
 	for (int i = 5; i < 9; i++) {
@@ -110,11 +114,18 @@ double calcAngle()
 					lastValue = delta[i - 5];
 					break;
 				}
+				else {
+					lastValue = 0;
+				}
 			}
 		}
 		else {
 			delta[i - 5] = lastValue;
 			dSum += delta[i - 5];
+		}
+
+		if (delta[i - 5]) {
+			numOfDeltasCalculated++;
 		}
 	}
 
@@ -125,21 +136,25 @@ double calcAngle()
 	}
 
 	printf("\nAngle: dSum: %lf\n", dSum);
+	printf("\nAngle: Liczba uzyskanych delt: %d\n", numOfDeltasCalculated);
 
 	//ustalenie przewazajacego obrotu
 	//														TODO: (mozna dodac jakis margines bledu dla NONE)
 	if (dSum < 0) {
 		rotationError = COUNTERCLOCKWISE;
-
-
+		angle = -1 * atan2(dSum * velocity, numOfDeltasCalculated * DISTANCE_BETWEEN_SENSORS);
 	}
 	else if (dSum > 0) {
 		rotationError = CLOCKWISE;
+		angle = atan2(dSum * velocity, numOfDeltasCalculated * DISTANCE_BETWEEN_SENSORS);
 	}
 	else {
 		rotationError = NONE;
 		angle = 0;
 	}
+
+	printf("\nAngle: Kat w rad: %lf\n", angle);
+	printf("\nAngle: Obrot: %d\n", rotationError);
 
 	double angle_st = 180 * angle / PI;
 
@@ -157,6 +172,7 @@ int main()
 				times[i] = 1000 + rand() % 100;
 			}
 			else {
+				//times[i] = 2000 - i * 10;
 				times[i] = 2000 + rand() % 100;
 			}
 		}
@@ -172,8 +188,8 @@ int main()
 		}
 
 #ifdef VELOCITY
-		double v = calcVelocity();
-		printf("\nResult: %lf\n", v);
+		velocity = calcVelocity();
+		printf("\nResult: %lf\n", velocity);
 #endif
 
 #ifdef ANGLE
